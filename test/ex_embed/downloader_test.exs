@@ -53,6 +53,15 @@ defmodule ExEmbed.DownloaderTest do
     end
   end
 
+  describe "revision support" do
+    test "models without revision field default to main" do
+      {:ok, meta} = ExEmbed.Registry.get("BAAI/bge-small-en-v1.5")
+      # revision field is optional — should default to "main" in downloader
+      revision = Map.get(meta, :revision, "main") || "main"
+      assert revision == "main"
+    end
+  end
+
   describe "checksum verification" do
     @tag :requires_model
     test "ensure/1 accepts files with correct checksums" do

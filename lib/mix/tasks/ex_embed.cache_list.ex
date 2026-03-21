@@ -14,11 +14,14 @@ defmodule Mix.Tasks.ExEmbed.CacheList do
       Application.get_env(:ex_embed, :cache_dir) ||
         Path.join([System.user_home!(), ".cache", "ex_embed"])
 
-    unless File.dir?(cache_dir) do
+    if not File.dir?(cache_dir) do
       Mix.shell().info("Cache directory does not exist: #{cache_dir}")
-      return_or_exit()
+    else
+      list_models(cache_dir)
     end
+  end
 
+  defp list_models(cache_dir) do
     entries =
       cache_dir
       |> File.ls!()
@@ -89,6 +92,4 @@ defmodule Mix.Tasks.ExEmbed.CacheList do
   defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"
   defp format_size(bytes) when bytes < 1_048_576, do: "#{Float.round(bytes / 1024, 1)} KB"
   defp format_size(bytes), do: "#{Float.round(bytes / 1_048_576, 1)} MB"
-
-  defp return_or_exit, do: :ok
 end

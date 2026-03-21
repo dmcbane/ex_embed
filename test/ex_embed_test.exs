@@ -82,6 +82,27 @@ defmodule ExEmbedTest do
       sim = ExEmbed.similarity(v1, v2)
       assert sim < 0.5
     end
+
+    @tag :requires_model
+    test "returns a float between -1.0 and 1.0" do
+      {:ok, t} = ExEmbed.embed(["alpha", "beta"])
+      [v1, v2] = Nx.to_batched(t, 1) |> Enum.to_list()
+      sim = ExEmbed.similarity(v1, v2)
+      assert is_float(sim)
+      assert sim >= -1.0 and sim <= 1.0
+    end
+
+    test "works with raw tensors (not just embeddings)" do
+      v1 = Nx.tensor([1.0, 0.0, 0.0])
+      v2 = Nx.tensor([0.0, 1.0, 0.0])
+      assert_in_delta ExEmbed.similarity(v1, v2), 0.0, 0.001
+    end
+
+    test "orthogonal unit vectors have similarity 0" do
+      v1 = Nx.tensor([1.0, 0.0])
+      v2 = Nx.tensor([0.0, 1.0])
+      assert_in_delta ExEmbed.similarity(v1, v2), 0.0, 0.001
+    end
   end
 
   describe "model_info/1" do
@@ -93,6 +114,21 @@ defmodule ExEmbedTest do
 
     test "returns error for unknown model" do
       assert {:error, :not_found} = ExEmbed.model_info("fake/nonexistent-xyz")
+    end
+
+    test "includes all expected fields" do
+      {:ok, info} = ExEmbed.model_info("BAAI/bge-small-en-v1.5")
+      assert Map.has_key?(info, :name)
+      assert Map.has_key?(info, :dim)
+      assert Map.has_key?(info, :hf_repo)
+      assert Map.has_key?(info, :model_file)
+      assert Map.has_key?(info, :additional_files)
+      assert Map.has_key?(info, :size_gb)
+    end
+
+    test "dim matches actual model output without loading" do
+      {:ok, info} = ExEmbed.model_info("BAAI/bge-small-en-v1.5")
+      assert info.dim == 384
     end
   end
 

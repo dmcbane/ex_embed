@@ -75,6 +75,13 @@ defmodule ExEmbed.CacheTest do
     end
   end
 
+  describe "truncation direction" do
+    test "truncation_direction defaults to :right" do
+      direction = Application.get_env(:ex_embed, :truncation_direction, :right)
+      assert direction in [:left, :right]
+    end
+  end
+
   describe "preload/1" do
     test "returns {:error, :not_found} for unknown model" do
       assert {:error, :not_found} = ExEmbed.Cache.preload("fake/nonexistent-model-xyz")

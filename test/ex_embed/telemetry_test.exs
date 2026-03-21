@@ -50,5 +50,70 @@ defmodule ExEmbed.TelemetryTest do
 
       assert_receive {:telemetry, [:ex_embed, :cache, :hit], _, %{model: "BAAI/bge-small-en-v1.5"}}
     end
+
+    test "emits cache miss event for unknown model" do
+      ref = make_ref()
+      pid = self()
+
+      :telemetry.attach(
+        "test-miss-#{inspect(ref)}",
+        [:ex_embed, :cache, :miss],
+        fn event, measurements, metadata, _ ->
+          send(pid, {:telemetry, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach("test-miss-#{inspect(ref)}") end)
+
+      {:error, _} = ExEmbed.Cache.fetch("fake/not-a-model-xyz")
+
+      assert_receive {:telemetry, [:ex_embed, :cache, :miss], _, %{model: "fake/not-a-model-xyz"}}
+    end
+  end
+
+  describe "embed exception telemetry" do
+    test "emits exception event on error" do
+      ref = make_ref()
+      pid = self()
+
+      :telemetry.attach(
+        "test-exception-#{inspect(ref)}",
+        [:ex_embed, :embed, :exception],
+        fn event, measurements, metadata, _ ->
+          send(pid, {:telemetry, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach("test-exception-#{inspect(ref)}") end)
+
+      {:error, _} = ExEmbed.embed("hello", model: "fake/nonexistent-xyz")
+
+      assert_receive {:telemetry, [:ex_embed, :embed, :exception], %{duration: _}, %{model: "fake/nonexistent-xyz"}}
+    end
+  end
+
+  describe "embed telemetry metadata" do
+    @tag :requires_model
+    test "includes batch_size in metadata" do
+      ref = make_ref()
+      pid = self()
+
+      :telemetry.attach(
+        "test-batch-#{inspect(ref)}",
+        [:ex_embed, :embed, :stop],
+        fn event, measurements, metadata, _ ->
+          send(pid, {:telemetry, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach("test-batch-#{inspect(ref)}") end)
+
+      {:ok, _} = ExEmbed.embed(["one", "two", "three"])
+
+      assert_receive {:telemetry, [:ex_embed, :embed, :stop], _, %{batch_size: 3}}
+    end
   end
 end

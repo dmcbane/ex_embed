@@ -20,6 +20,18 @@ defmodule ExEmbed.HFClientTest do
     end
   end
 
+  describe "resolve_url/3 with revision" do
+    test "uses custom revision instead of main" do
+      url = HFClient.resolve_url("org/repo", "model.onnx", "abc123def")
+      assert url == "https://huggingface.co/org/repo/resolve/abc123def/model.onnx"
+    end
+
+    test "defaults to main when no revision given" do
+      url = HFClient.resolve_url("org/repo", "model.onnx")
+      assert url =~ "/resolve/main/"
+    end
+  end
+
   describe "model_info/1" do
     @tag :requires_network
     test "returns metadata for a valid repo" do
