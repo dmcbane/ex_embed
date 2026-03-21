@@ -21,7 +21,11 @@ defmodule ExEmbed.Downloader do
     with {:ok, meta} <- Registry.get(model_name),
          {:ok, cache_path} <- model_cache_path(meta.hf_repo) do
       files = [meta.model_file | meta.additional_files]
-      checksums = Map.get(meta, :checksums, %{}) || %{}
+      # Registry JSON is decoded with keys: :atoms, so checksum keys are atoms.
+      # Convert to string keys for consistent lookup against filename strings.
+      checksums =
+        (Map.get(meta, :checksums) || %{})
+        |> Map.new(fn {k, v} -> {to_string(k), v} end)
 
       with :ok <- validate_filenames(files, cache_path) do
         # Files are "needed" if missing or if they fail checksum verification
