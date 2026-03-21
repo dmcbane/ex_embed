@@ -46,6 +46,7 @@ defmodule ExEmbed.Serving do
     - `:batch_size` - max batch size (default: Nx.Serving default)
     - `:batch_timeout` - ms to wait for batch to fill (default: 100)
   """
+  @spec start_link(keyword()) :: GenServer.on_start() | :ignore
   def start_link(opts \\ []) do
     model_name = Keyword.get(opts, :model, Registry.default())
 
@@ -62,17 +63,18 @@ defmodule ExEmbed.Serving do
         Nx.Serving.start_link(serving_opts)
 
       {:error, reason} ->
-        Logger.warning("[ExEmbed] Serving not started: model unavailable")
-        Logger.debug("[ExEmbed] Serving start failure detail: #{inspect(reason)}")
+        Logger.warning("Serving not started: model unavailable")
+        Logger.debug("Serving start failure", reason: inspect(reason))
         :ignore
     end
   rescue
     e ->
-      Logger.warning("[ExEmbed] Serving failed to start")
-      Logger.debug("[ExEmbed] Serving start exception: #{Exception.message(e)}")
+      Logger.warning("Serving failed to start")
+      Logger.debug("Serving start exception", error: Exception.message(e))
       :ignore
   end
 
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
     %{
       id: __MODULE__,
@@ -114,12 +116,15 @@ defmodule ExEmbed.Serving do
   # ── Nx.Serving callbacks ──────────────────────────────────────────────────
 
   @impl true
+  @spec init(:inline | :process, String.t(), [keyword()]) :: {:ok, Ortex.Model.t()}
   def init(_type, model_name, [_defn_options]) do
     {:ok, {model, _tokenizer}} = Cache.fetch(model_name)
     {:ok, model}
   end
 
   @impl true
+  @spec handle_batch(Nx.Batch.t(), non_neg_integer(), Ortex.Model.t()) ::
+          {:execute, (-> {term(), term()}), Ortex.Model.t()}
   def handle_batch(batch, _partition, model) do
     {ids, mask, types} = Nx.Defn.jit_apply(&Function.identity/1, [batch])
 

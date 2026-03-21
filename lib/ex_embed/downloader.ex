@@ -49,9 +49,11 @@ defmodule ExEmbed.Downloader do
             if File.exists?(dest), do: File.rm(dest)
           end)
 
-          Logger.info("[ExEmbed] Downloading #{length(needed)} file(s)")
+          Logger.info("Downloading files", count: length(needed))
 
-          with {:ok, cache_path} <- download_files(meta.hf_repo, needed, cache_path) do
+          revision = Map.get(meta, :revision, "main") || "main"
+
+          with {:ok, cache_path} <- download_files(meta.hf_repo, needed, cache_path, revision) do
             verify_checksums(needed, cache_path, checksums)
           end
         end
@@ -95,12 +97,12 @@ defmodule ExEmbed.Downloader do
     end
   end
 
-  defp download_files(hf_repo, files, cache_path) do
+  defp download_files(hf_repo, files, cache_path, revision \\ "main") do
     results =
       Enum.map(files, fn filename ->
         dest = Path.join(cache_path, filename)
 
-        case HFClient.download_file(hf_repo, filename, dest) do
+        case HFClient.download_file(hf_repo, filename, dest, revision: revision) do
           :ok -> {:ok, filename}
           {:error, reason} -> {:error, {filename, reason}}
         end

@@ -58,5 +58,28 @@ defmodule ExEmbed.HFClientTest do
 
       assert {:error, _} = HFClient.download_file("qdrant/bge-small-en-v1.5-onnx-q", "nonexistent_file.bin", dest)
     end
+
+    @tag :requires_network
+    test "failed download leaves no partial file at dest" do
+      tmp = Path.join(System.tmp_dir!(), "ex_embed_test_#{System.unique_integer([:positive])}")
+      dest = Path.join(tmp, "should_not_exist.bin")
+
+      on_exit(fn -> File.rm_rf!(tmp) end)
+
+      {:error, _} = HFClient.download_file("qdrant/bge-small-en-v1.5-onnx-q", "nonexistent_file.bin", dest)
+      refute File.exists?(dest), "Failed download should not leave partial file"
+    end
+
+    @tag :requires_network
+    test "no .tmp file remains after successful download" do
+      tmp = Path.join(System.tmp_dir!(), "ex_embed_test_#{System.unique_integer([:positive])}")
+      dest = Path.join(tmp, "tokenizer.json")
+
+      on_exit(fn -> File.rm_rf!(tmp) end)
+
+      :ok = HFClient.download_file("qdrant/bge-small-en-v1.5-onnx-q", "tokenizer.json", dest)
+      refute File.exists?(dest <> ".tmp"), "Temp file should be cleaned up"
+      assert File.exists?(dest)
+    end
   end
 end

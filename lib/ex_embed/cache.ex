@@ -20,6 +20,7 @@ defmodule ExEmbed.Cache do
 
   # ── public API ─────────────────────────────────────────────────────────────
 
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, %{}, Keyword.put_new(opts, :name, __MODULE__))
   end
@@ -60,14 +61,21 @@ defmodule ExEmbed.Cache do
 
   @impl true
   def handle_call({:fetch, model_name}, _from, state) do
+    meta = %{model: model_name}
+
     case Map.fetch(state, model_name) do
       {:ok, {entry, _last_used}} ->
-        # Update last-used timestamp
+        :telemetry.execute([:ex_embed, :cache, :hit], %{}, meta)
         {:reply, {:ok, entry}, Map.put(state, model_name, {entry, now()})}
 
       :error ->
+        :telemetry.execute([:ex_embed, :cache, :miss], %{}, meta)
+        start_time = System.monotonic_time()
+
         case load_model(model_name) do
           {:ok, entry} ->
+            duration = System.monotonic_time() - start_time
+            :telemetry.execute([:ex_embed, :cache, :load], %{duration: duration}, meta)
             state = maybe_evict(state)
             {:reply, {:ok, entry}, Map.put(state, model_name, {entry, now()})}
 
@@ -90,7 +98,7 @@ defmodule ExEmbed.Cache do
   # ── private ────────────────────────────────────────────────────────────────
 
   defp load_model(model_name) do
-    Logger.debug("[ExEmbed] Loading model: #{model_name}")
+    Logger.debug("Loading model", model: model_name)
 
     with {:ok, meta} <- Registry.get(model_name),
          {:ok, cache_path} <- Downloader.ensure(model_name) do
@@ -102,12 +110,12 @@ defmodule ExEmbed.Cache do
 
         with {:ok, tokenizer} <- Tokenizers.Tokenizer.from_file(tokenizer_path) do
           tokenizer = configure_tokenizer(tokenizer)
-          Logger.info("[ExEmbed] Model ready: #{model_name} (#{meta.dim}d)")
+          Logger.info("Model ready", model: model_name, dim: meta.dim)
           {:ok, {model, tokenizer}}
         end
       rescue
         e ->
-          Logger.debug("[ExEmbed] Model load failed: #{Exception.message(e)}")
+          Logger.debug("Model load failed", error: Exception.message(e))
           {:error, :model_load_failed}
       end
     end
@@ -119,7 +127,7 @@ defmodule ExEmbed.Cache do
     if map_size(state) >= max do
       # Evict least-recently-used model
       {lru_name, _} = Enum.min_by(state, fn {_name, {_entry, last_used}} -> last_used end)
-      Logger.info("[ExEmbed] Evicting LRU model: #{lru_name}")
+      Logger.info("Evicting LRU model", model: lru_name)
       Map.delete(state, lru_name)
     else
       state
@@ -129,8 +137,10 @@ defmodule ExEmbed.Cache do
   defp now, do: System.monotonic_time(:millisecond)
 
   defp configure_tokenizer(tokenizer) do
+    direction = Application.get_env(:ex_embed, :truncation_direction, :right)
+
     tokenizer
-    |> Tokenizers.Tokenizer.set_truncation(max_length: 512)
+    |> Tokenizers.Tokenizer.set_truncation(max_length: 512, direction: direction)
     |> Tokenizers.Tokenizer.set_padding(strategy: :batch_longest)
   end
 end

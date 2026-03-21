@@ -69,6 +69,13 @@ defmodule ExEmbed.PipelineTest do
     end
 
     @tag :requires_model
+    test "invalid UTF-8 returns an error" do
+      {:ok, {model, tokenizer}} = ExEmbed.Cache.fetch("BAAI/bge-small-en-v1.5")
+      # Invalid UTF-8 byte sequence
+      assert {:error, :invalid_utf8} = Pipeline.embed([<<0xFF, 0xFE>>], model, tokenizer)
+    end
+
+    @tag :requires_model
     test "unicode and emoji text does not crash" do
       {:ok, {model, tokenizer}} = ExEmbed.Cache.fetch("BAAI/bge-small-en-v1.5")
       {:ok, tensor} = Pipeline.embed(["Hello 🌍 résumé naïve 日本語"], model, tokenizer)

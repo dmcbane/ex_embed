@@ -18,6 +18,14 @@ defmodule ExEmbed.Pipeline do
   def embed([], _model, _tokenizer), do: {:error, :empty_input}
 
   def embed(texts, model, tokenizer) when is_list(texts) do
+    if not Enum.all?(texts, &String.valid?/1) do
+      {:error, :invalid_utf8}
+    else
+      do_embed(texts, model, tokenizer)
+    end
+  end
+
+  defp do_embed(texts, model, tokenizer) do
     with {:ok, {ids, attention_mask, token_type_ids}} <- tokenize_batch(texts, tokenizer),
          {:ok, hidden_state} <- run_inference(model, ids, attention_mask, token_type_ids) do
       embedding = mean_pool_and_normalize(hidden_state, attention_mask)
@@ -48,7 +56,7 @@ defmodule ExEmbed.Pipeline do
     end
   rescue
     e ->
-      Logger.debug("[ExEmbed] Tokenization failed: #{Exception.message(e)}")
+      Logger.debug("Tokenization failed", error: Exception.message(e))
       {:error, :tokenization_failed}
   end
 
@@ -68,7 +76,7 @@ defmodule ExEmbed.Pipeline do
       {:ok, Nx.backend_transfer(hidden)}
     rescue
       e ->
-        Logger.debug("[ExEmbed] Inference failed: #{Exception.message(e)}")
+        Logger.debug("Inference failed", error: Exception.message(e))
         {:error, :inference_failed}
     end
   end

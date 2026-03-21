@@ -67,6 +67,46 @@ defmodule ExEmbedTest do
     end
   end
 
+  describe "similarity/2" do
+    @tag :requires_model
+    test "identical texts have similarity ~1.0" do
+      {:ok, t} = ExEmbed.embed(["hello", "hello"])
+      [v1, v2] = Nx.to_batched(t, 1) |> Enum.to_list()
+      assert_in_delta ExEmbed.similarity(v1, v2), 1.0, 0.001
+    end
+
+    @tag :requires_model
+    test "unrelated texts have lower similarity" do
+      {:ok, t} = ExEmbed.embed(["cat on a mat", "stock market crash"])
+      [v1, v2] = Nx.to_batched(t, 1) |> Enum.to_list()
+      sim = ExEmbed.similarity(v1, v2)
+      assert sim < 0.5
+    end
+  end
+
+  describe "model_info/1" do
+    test "returns metadata for a known model" do
+      assert {:ok, info} = ExEmbed.model_info("BAAI/bge-small-en-v1.5")
+      assert info.dim == 384
+      assert is_binary(info.hf_repo)
+    end
+
+    test "returns error for unknown model" do
+      assert {:error, :not_found} = ExEmbed.model_info("fake/nonexistent-xyz")
+    end
+  end
+
+  describe "health_check/1" do
+    @tag :requires_model
+    test "returns :ok when model is working" do
+      assert :ok = ExEmbed.health_check()
+    end
+
+    test "returns error for unknown model" do
+      assert {:error, _} = ExEmbed.health_check("fake/nonexistent-xyz")
+    end
+  end
+
   describe "available?/1" do
     test "returns false for unknown model" do
       refute ExEmbed.available?("fake/nonexistent-xyz")

@@ -44,10 +44,27 @@ defmodule ExEmbed do
   def embed(text_or_texts, opts \\ []) do
     model_name = Keyword.get(opts, :model, Registry.default())
     texts = List.wrap(text_or_texts)
+    meta = %{model: model_name, batch_size: length(texts)}
+    start_time = System.monotonic_time()
 
-    with {:ok, {model, tokenizer}} <- Cache.fetch(model_name) do
-      Pipeline.embed(texts, model, tokenizer)
+    :telemetry.execute([:ex_embed, :embed, :start], %{system_time: System.system_time()}, meta)
+
+    result =
+      with {:ok, {model, tokenizer}} <- Cache.fetch(model_name) do
+        Pipeline.embed(texts, model, tokenizer)
+      end
+
+    duration = System.monotonic_time() - start_time
+
+    case result do
+      {:ok, _} ->
+        :telemetry.execute([:ex_embed, :embed, :stop], %{duration: duration}, meta)
+
+      {:error, _} ->
+        :telemetry.execute([:ex_embed, :embed, :exception], %{duration: duration}, meta)
     end
+
+    result
   end
 
   @doc """
@@ -72,4 +89,36 @@ defmodule ExEmbed do
   @doc "Check if a model is loaded and ready for inference."
   @spec available?(String.t()) :: boolean()
   def available?(model_name \\ Registry.default()), do: Cache.available?(model_name)
+
+  @doc """
+  Cosine similarity between two embedding tensors.
+
+  Since embeddings are L2-normalized, this is equivalent to the dot product.
+  Returns a float between -1.0 (opposite) and 1.0 (identical).
+  """
+  @spec similarity(Nx.Tensor.t(), Nx.Tensor.t()) :: float()
+  def similarity(vec1, vec2) do
+    Nx.dot(Nx.flatten(vec1), Nx.flatten(vec2)) |> Nx.to_number()
+  end
+
+  @doc """
+  Get model metadata from the registry without loading.
+
+  Returns `{:ok, %{name, dim, hf_repo, ...}}` or `{:error, :not_found}`.
+  """
+  @spec model_info(String.t()) :: {:ok, map()} | {:error, :not_found}
+  def model_info(model_name), do: Registry.get(model_name)
+
+  @doc """
+  Verify the full pipeline works for a model by running a dummy embed.
+
+  Returns `:ok` if inference succeeds, or `{:error, reason}` on failure.
+  """
+  @spec health_check(String.t()) :: :ok | {:error, term()}
+  def health_check(model_name \\ Registry.default()) do
+    case embed("health check", model: model_name) do
+      {:ok, _} -> :ok
+      {:error, _} = err -> err
+    end
+  end
 end
