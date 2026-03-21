@@ -1,0 +1,112 @@
+[
+  {
+    "name": "BAAI/bge-small-en-v1.5",
+    "dim": 384,
+    "description": "Fast, lightweight English embeddings. Default model.",
+    "hf_repo": "qdrant/bge-small-en-v1.5-onnx-q",
+    "model_file": "model_optimized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"],
+    "size_gb": 0.067,
+    "license": "mit",
+    "default": true
+  },
+  {
+    "name": "BAAI/bge-base-en-v1.5",
+    "dim": 768,
+    "description": "Balanced English embeddings, better quality than small.",
+    "hf_repo": "qdrant/bge-base-en-v1.5-onnx-q",
+    "model_file": "model_optimized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"],
+    "size_gb": 0.21,
+    "license": "mit",
+    "default": false
+  },
+  {
+    "name": "BAAI/bge-large-en-v1.5",
+    "dim": 1024,
+    "description": "High-quality English embeddings, highest accuracy in BGE family.",
+    "hf_repo": "qdrant/bge-large-en-v1.5-onnx-q",
+    "model_file": "model_optimized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"],
+    "size_gb": 0.59,
+    "license": "mit",
+    "default": false
+  },
+  {
+    "name": "sentence-transformers/all-MiniLM-L6-v2",
+    "dim": 384,
+    "description": "Popular general-purpose sentence embeddings, widely supported.",
+    "hf_repo": "qdrant/all-MiniLM-L6-v2-onnx-Q",
+    "model_file": "model_optimized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"],
+    "size_gb": 0.09,
+    "license": "apache-2.0",
+    "default": false
+  },
+  {
+    "name": "nomic-ai/nomic-embed-text-v1.5",
+    "dim": 768,
+    "description": "Long context (8192 tokens) English embeddings.",
+    "hf_repo": "nomic-ai/nomic-embed-text-v1.5-ONNX",
+    "model_file": "model_quantized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json"],
+    "size_gb": 0.13,
+    "license": "apache-2.0",
+    "default": false
+  },
+  {
+    "name": "intfloat/multilingual-e5-small",
+    "dim": 384,
+    "description": "Multilingual embeddings, 100+ languages, small.",
+    "hf_repo": "qdrant/multilingual-e5-small-onnx",
+    "model_file": "model_optimized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json", "sentencepiece.bpe.model"],
+    "size_gb": 0.12,
+    "license": "mit",
+    "default": false
+  },
+  {
+    "name": "intfloat/multilingual-e5-base",
+    "dim": 768,
+    "description": "Multilingual embeddings, 100+ languages, base.",
+    "hf_repo": "qdrant/multilingual-e5-base-onnx",
+    "model_file": "model_optimized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json", "sentencepiece.bpe.model"],
+    "size_gb": 0.27,
+    "license": "mit",
+    "default": false
+  },
+  {
+    "name": "mixedbread-ai/mxbai-embed-large-v1",
+    "dim": 1024,
+    "description": "High-performance English embeddings, strong MTEB scores.",
+    "hf_repo": "mixedbread-ai/mxbai-embed-large-v1-onnx-int8",
+    "model_file": "model.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json"],
+    "size_gb": 0.56,
+    "license": "apache-2.0",
+    "default": false
+  },
+  {
+    "name": "Alibaba-NLP/gte-base-en-v1.5",
+    "dim": 768,
+    "description": "Strong English embeddings from Alibaba NLP.",
+    "hf_repo": "qdrant/gte-base-en-v1.5-onnx-q",
+    "model_file": "model_optimized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json"],
+    "size_gb": 0.21,
+    "license": "apache-2.0",
+    "default": false
+  },
+  {
+    "name": "BAAI/bge-m3",
+    "dim": 1024,
+    "description": "Multilingual, multi-granularity embeddings. 100+ languages.",
+    "hf_repo": "qdrant/bge-m3-onnx-q",
+    "model_file": "model_optimized.onnx",
+    "additional_files": ["tokenizer.json", "tokenizer_config.json"],
+    "size_gb": 1.2,
+    "license": "mit",
+    "default": false
+  }
+]
