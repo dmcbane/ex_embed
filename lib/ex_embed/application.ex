@@ -4,11 +4,16 @@ defmodule ExEmbed.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      ExEmbed.Cache
-    ]
+    children = [ExEmbed.Cache] ++ serving_children()
 
     opts = [strategy: :one_for_one, name: ExEmbed.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp serving_children do
+    case Application.get_env(:ex_embed, :serving) do
+      nil -> []
+      opts when is_list(opts) -> [{ExEmbed.Serving, opts}]
+    end
   end
 end

@@ -28,8 +28,11 @@ defmodule ExEmbed.HFClientTest do
     end
 
     @tag :requires_network
-    test "returns {:error, {:not_found, _}} for nonexistent repo" do
-      assert {:error, {:not_found, _}} = HFClient.model_info("definitely-fake/not-a-real-repo-xyz")
+    test "returns error for nonexistent repo" do
+      # HuggingFace returns 401 (not 404) for nonexistent repos to avoid
+      # leaking info about private repos.
+      assert {:error, reason} = HFClient.model_info("definitely-fake/not-a-real-repo-xyz")
+      assert reason in [{:not_found, "definitely-fake/not-a-real-repo-xyz"}, {:http_error, 401}]
     end
   end
 

@@ -33,6 +33,12 @@ defmodule ExEmbed.Cache do
     end
   end
 
+  @doc "Check if a model is already loaded in the cache (does not trigger loading)."
+  @spec available?(String.t()) :: boolean()
+  def available?(model_name \\ ExEmbed.Registry.default()) do
+    GenServer.call(__MODULE__, {:available?, model_name})
+  end
+
   @doc "List currently loaded model names."
   @spec loaded() :: [String.t()]
   def loaded do
@@ -62,6 +68,11 @@ defmodule ExEmbed.Cache do
   end
 
   @impl true
+  def handle_call({:available?, model_name}, _from, state) do
+    {:reply, Map.has_key?(state, model_name), state}
+  end
+
+  @impl true
   def handle_call(:loaded, _from, state) do
     {:reply, Map.keys(state), state}
   end
@@ -80,6 +91,7 @@ defmodule ExEmbed.Cache do
         model = Ortex.load(model_path)
 
         with {:ok, tokenizer} <- Tokenizers.Tokenizer.from_file(tokenizer_path) do
+          tokenizer = configure_tokenizer(tokenizer)
           Logger.info("[ExEmbed] Model ready: #{model_name} (#{meta.dim}d)")
           {:ok, {model, tokenizer}}
         end
@@ -87,5 +99,11 @@ defmodule ExEmbed.Cache do
         e -> {:error, {:model_load_failed, Exception.message(e)}}
       end
     end
+  end
+
+  defp configure_tokenizer(tokenizer) do
+    tokenizer
+    |> Tokenizers.Tokenizer.set_truncation(max_length: 512)
+    |> Tokenizers.Tokenizer.set_padding(strategy: :batch_longest)
   end
 end

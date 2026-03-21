@@ -31,6 +31,7 @@ defmodule ExEmbed.MixProject do
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.0"},
+      {:exla, "~> 0.7", optional: true},
       # dev/test
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}

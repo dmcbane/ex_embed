@@ -46,9 +46,9 @@ Note: Pipeline tests download models from HuggingFace on first run. Registry tes
 
 ### Three-Tier Design
 
-**Tier 1 — Pure Pipeline (`ExEmbed.Pipeline`):** Stateless embedding function. Takes texts + loaded model/tokenizer, returns normalized embedding tensors. Flow: tokenize → batch & pad → ONNX inference → mean pool → L2 normalize.
+**Tier 1 — Pure Pipeline (`ExEmbed.Pipeline`):** Stateless embedding function. Takes texts + loaded model/tokenizer, returns normalized embedding tensors. Tokenization uses `Tokenizers.encode_batch/3` with truncation (512 tokens) and padding configured at load time. Pooling/normalization is a `defn` function — JIT-compiled by EXLA when configured, otherwise interpreted.
 
-**Tier 2 — Stateful Cache & Serving (`ExEmbed.Cache`, `ExEmbed.Serving`):** Cache is a GenServer that lazy-loads and memoizes models. Serving wraps Nx.Serving for batched inference with backpressure. The Application supervisor starts Cache automatically.
+**Tier 2 — Stateful Cache & Serving (`ExEmbed.Cache`, `ExEmbed.Serving`):** Cache is a GenServer that lazy-loads models and configures tokenizers with truncation/padding. Serving implements `@behaviour Nx.Serving` for proper batching: tokenization in `client_preprocessing`, ONNX inference in `handle_batch`, pooling in `client_postprocessing`. Supports graceful degradation — `start_link/1` returns `:ignore` on failure, `available?/1` for health checks.
 
 **Tier 3 — B+C Hybrid Registry (`ExEmbed.Registry`, `ExEmbed.Downloader`, `ExEmbed.HFClient`):**
 - **B (build-time):** `priv/registry/models.json` is loaded into `@models` module attribute at compile time — fast lookup, works offline.
@@ -60,19 +60,26 @@ Note: Pipeline tests download models from HuggingFace on first run. Registry tes
 
 ### Public API
 
-The main entry point is `ExEmbed` (lib/ex_embed/ex_embed.ex) which exposes `embed/2`, `embed!/2`, `list_models/0`, and `preload/1`.
+The main entry point is `ExEmbed` (lib/ex_embed.ex) which exposes `embed/2`, `embed!/2`, `list_models/0`, `preload/1`, and `available?/1`.
 
 ### Key Dependencies
 
 - **ortex** — ONNX Runtime bindings (`Ortex.load/1`, `Ortex.run/2`)
 - **tokenizers** — HuggingFace tokenizer bindings
-- **nx** — Tensor operations (padding, pooling, normalization)
+- **nx** — Tensor operations (pooling, normalization via `defn`)
+- **exla** — Optional EXLA backend for JIT-compiled pooling/normalization
 - **req** — HTTP client for HuggingFace downloads
 
 ### Configuration
 
 ```elixir
 config :ex_embed, cache_dir: "/custom/path"  # default: ~/.cache/ex_embed
+
+# Optional: start a supervised Serving process at app boot
+config :ex_embed, serving: [batch_timeout: 100]
+
+# Optional: enable EXLA acceleration for pooling/normalization
+config :nx, default_defn_options: [compiler: EXLA]
 ```
 
 The `HF_TOKEN` env var is respected for private model access.

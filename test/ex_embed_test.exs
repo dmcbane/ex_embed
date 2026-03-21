@@ -66,4 +66,16 @@ defmodule ExEmbedTest do
       assert :ok = ExEmbed.preload("BAAI/bge-small-en-v1.5")
     end
   end
+
+  describe "available?/1" do
+    test "returns false for unknown model" do
+      refute ExEmbed.available?("fake/nonexistent-xyz")
+    end
+
+    @tag :requires_model
+    test "returns true after model is loaded" do
+      {:ok, _} = ExEmbed.embed("test")
+      assert ExEmbed.available?()
+    end
+  end
 end

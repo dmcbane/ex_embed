@@ -68,4 +68,8 @@ defmodule ExEmbed do
   @doc "Preload a model into the cache to avoid latency on first use."
   @spec preload(String.t()) :: :ok | {:error, term()}
   def preload(model_name), do: Cache.preload(model_name)
+
+  @doc "Check if a model is loaded and ready for inference."
+  @spec available?(String.t()) :: boolean()
+  def available?(model_name \\ Registry.default()), do: Cache.available?(model_name)
 end

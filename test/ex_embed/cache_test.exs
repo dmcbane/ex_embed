@@ -18,8 +18,15 @@ defmodule ExEmbed.CacheTest do
     test "fetch loads and returns {model, tokenizer} tuple" do
       assert {:ok, {model, tokenizer}} = ExEmbed.Cache.fetch("BAAI/bge-small-en-v1.5")
       assert %Ortex.Model{} = model
-      # Tokenizer is an opaque reference, just verify it's not nil
       assert tokenizer != nil
+    end
+
+    @tag :requires_model
+    test "tokenizer has truncation and padding configured" do
+      {:ok, {_model, tokenizer}} = ExEmbed.Cache.fetch("BAAI/bge-small-en-v1.5")
+      # Verify truncation/padding work by encoding a very long text — should not exceed 512 tokens
+      {:ok, enc} = Tokenizers.Tokenizer.encode(tokenizer, String.duplicate("word ", 2000))
+      assert length(Tokenizers.Encoding.get_ids(enc)) <= 512
     end
 
     @tag :requires_model
@@ -45,6 +52,18 @@ defmodule ExEmbed.CacheTest do
 
       results = Task.await_many(tasks, :timer.minutes(2))
       assert Enum.all?(results, &match?({:ok, _}, &1))
+    end
+  end
+
+  describe "available?/1" do
+    test "returns false for model not yet loaded" do
+      refute ExEmbed.Cache.available?("definitely/not-loaded-xyz")
+    end
+
+    @tag :requires_model
+    test "returns true after model is fetched" do
+      {:ok, _} = ExEmbed.Cache.fetch("BAAI/bge-small-en-v1.5")
+      assert ExEmbed.Cache.available?("BAAI/bge-small-en-v1.5")
     end
   end
 

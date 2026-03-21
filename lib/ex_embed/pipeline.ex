@@ -6,6 +6,8 @@ defmodule ExEmbed.Pipeline do
   caching, use `ExEmbed.Cache` or `ExEmbed.Serving`.
   """
 
+  import Nx.Defn
+
   @doc """
   Embed a list of texts using a loaded model and tokenizer.
   Returns `{:ok, tensor}` where tensor shape is `{n, dim}`.
@@ -31,46 +33,20 @@ defmodule ExEmbed.Pipeline do
 
   # ── private ────────────────────────────────────────────────────────────────
 
-  # ONNX models typically have a fixed max sequence length
-  @max_tokens 512
-
   defp tokenize_batch(texts, tokenizer) do
-    try do
-      encodings =
-        Enum.map(texts, fn text ->
-          {:ok, enc} = Tokenizers.Tokenizer.encode(tokenizer, text, add_special_tokens: true)
-          enc
-        end)
+    with {:ok, encodings} <- Tokenizers.Tokenizer.encode_batch(tokenizer, texts, add_special_tokens: true) do
+      ids_list = Enum.map(encodings, &Tokenizers.Encoding.get_ids/1)
+      mask_list = Enum.map(encodings, &Tokenizers.Encoding.get_attention_mask/1)
+      type_list = Enum.map(encodings, &Tokenizers.Encoding.get_type_ids/1)
 
-      max_len =
-        encodings
-        |> Enum.map(&length(Tokenizers.Encoding.get_ids(&1)))
-        |> Enum.max()
-        |> min(@max_tokens)
-
-      # Truncate to max_len then pad all sequences to max_len
-      {ids_list, mask_list, type_list} =
-        Enum.reduce(encodings, {[], [], []}, fn enc, {ids_acc, mask_acc, type_acc} ->
-          ids = Tokenizers.Encoding.get_ids(enc) |> Enum.take(max_len)
-          mask = Tokenizers.Encoding.get_attention_mask(enc) |> Enum.take(max_len)
-          types = Tokenizers.Encoding.get_type_ids(enc) |> Enum.take(max_len)
-
-          pad_len = max_len - length(ids)
-          ids_padded = ids ++ List.duplicate(0, pad_len)
-          mask_padded = mask ++ List.duplicate(0, pad_len)
-          types_padded = types ++ List.duplicate(0, pad_len)
-
-          {[ids_padded | ids_acc], [mask_padded | mask_acc], [types_padded | type_acc]}
-        end)
-
-      ids_tensor = ids_list |> Enum.reverse() |> Nx.tensor(type: :s64)
-      mask_tensor = mask_list |> Enum.reverse() |> Nx.tensor(type: :s64)
-      type_tensor = type_list |> Enum.reverse() |> Nx.tensor(type: :s64)
+      ids_tensor = Nx.tensor(ids_list, type: :s64)
+      mask_tensor = Nx.tensor(mask_list, type: :s64)
+      type_tensor = Nx.tensor(type_list, type: :s64)
 
       {:ok, {ids_tensor, mask_tensor, type_tensor}}
-    rescue
-      e -> {:error, {:tokenization_failed, e}}
     end
+  rescue
+    e -> {:error, {:tokenization_failed, e}}
   end
 
   defp run_inference(model, ids, attention_mask, token_type_ids) do
@@ -92,7 +68,12 @@ defmodule ExEmbed.Pipeline do
     end
   end
 
-  defp mean_pool_and_normalize(hidden_state, attention_mask) do
+  @doc """
+  Mean pool hidden states using attention mask, then L2 normalize.
+
+  Accelerated via EXLA when configured (`config :nx, default_defn_options: [compiler: EXLA]`).
+  """
+  defn mean_pool_and_normalize(hidden_state, attention_mask) do
     # Expand mask: {batch, seq} → {batch, seq, 1}
     mask_expanded = Nx.new_axis(attention_mask, -1) |> Nx.as_type(:f32)
 
@@ -101,11 +82,11 @@ defmodule ExEmbed.Pipeline do
 
     # Sum over sequence dimension, divide by actual token count
     sum = Nx.sum(masked, axes: [1])
-    counts = Nx.sum(mask_expanded, axes: [1]) |> Nx.clip(1.0e-9, :infinity)
+    counts = Nx.sum(mask_expanded, axes: [1]) |> Nx.max(1.0e-9)
     pooled = Nx.divide(sum, counts)
 
     # L2 normalize
-    norm = Nx.LinAlg.norm(pooled, axes: [-1], keep_axes: true) |> Nx.clip(1.0e-12, :infinity)
+    norm = Nx.pow(pooled, 2) |> Nx.sum(axes: [-1], keep_axes: true) |> Nx.sqrt() |> Nx.max(1.0e-12)
     Nx.divide(pooled, norm)
   end
 end
