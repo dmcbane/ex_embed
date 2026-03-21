@@ -1,7 +1,7 @@
 defmodule ExEmbed.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.3.0"
 
   def project do
     [
@@ -9,6 +9,7 @@ defmodule ExEmbed.MixProject do
       version: @version,
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
+      aliases: aliases(),
       deps: deps(),
       description: "Elixir-native text embeddings via Ortex + Tokenizers with FastEmbed-compatible model registry",
       package: package(),
@@ -34,7 +35,14 @@ defmodule ExEmbed.MixProject do
       {:exla, "~> 0.7", optional: true},
       # dev/test
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:git_ops, "~> 2.6", only: :dev, runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      "version.bump": ["git_ops.release"]
     ]
   end
 
