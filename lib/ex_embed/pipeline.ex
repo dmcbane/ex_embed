@@ -7,6 +7,7 @@ defmodule ExEmbed.Pipeline do
   """
 
   import Nx.Defn
+  require Logger
 
   @doc """
   Embed a list of texts using a loaded model and tokenizer.
@@ -46,7 +47,9 @@ defmodule ExEmbed.Pipeline do
       {:ok, {ids_tensor, mask_tensor, type_tensor}}
     end
   rescue
-    e -> {:error, {:tokenization_failed, e}}
+    e ->
+      Logger.debug("[ExEmbed] Tokenization failed: #{Exception.message(e)}")
+      {:error, :tokenization_failed}
   end
 
   defp run_inference(model, ids, attention_mask, token_type_ids) do
@@ -58,13 +61,15 @@ defmodule ExEmbed.Pipeline do
           {h} -> h
           {h, _} -> h
           {h, _, _} -> h
-          other -> raise "Unexpected ONNX output shape: #{inspect(other)}"
+          _other -> raise "unexpected ONNX output shape"
         end
 
       # Transfer from Ortex backend to default Nx backend for math ops
       {:ok, Nx.backend_transfer(hidden)}
     rescue
-      e -> {:error, {:inference_failed, e}}
+      e ->
+        Logger.debug("[ExEmbed] Inference failed: #{Exception.message(e)}")
+        {:error, :inference_failed}
     end
   end
 

@@ -96,7 +96,9 @@ defmodule ExEmbed.Cache do
           {:ok, {model, tokenizer}}
         end
       rescue
-        e -> {:error, {:model_load_failed, Exception.message(e)}}
+        e ->
+          Logger.debug("[ExEmbed] Model load failed: #{Exception.message(e)}")
+          {:error, :model_load_failed}
       end
     end
   end

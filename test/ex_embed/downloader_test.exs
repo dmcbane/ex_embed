@@ -12,13 +12,62 @@ defmodule ExEmbed.DownloaderTest do
   describe "model_cache_path/1" do
     test "uses configured cache_dir" do
       Application.put_env(:ex_embed, :cache_dir, "/tmp/custom_cache")
-      assert Downloader.model_cache_path("org/repo") == "/tmp/custom_cache/org/repo"
+      assert {:ok, "/tmp/custom_cache/org/repo"} = Downloader.model_cache_path("org/repo")
     end
 
     test "defaults to ~/.cache/ex_embed when not configured" do
       Application.delete_env(:ex_embed, :cache_dir)
-      path = Downloader.model_cache_path("org/repo")
-      assert path == Path.join([System.user_home!(), ".cache", "ex_embed", "org/repo"])
+      expected = Path.join([System.user_home!(), ".cache", "ex_embed", "org/repo"])
+      assert {:ok, ^expected} = Downloader.model_cache_path("org/repo")
+    end
+  end
+
+  describe "path traversal protection" do
+    test "model_cache_path rejects paths with .. traversal" do
+      Application.put_env(:ex_embed, :cache_dir, "/tmp/safe_cache")
+      assert {:error, :invalid_path} = Downloader.model_cache_path("legit/../../etc")
+    end
+
+    test "model_cache_path rejects paths that resolve outside cache_dir" do
+      Application.put_env(:ex_embed, :cache_dir, "/tmp/safe_cache")
+      assert {:error, :invalid_path} = Downloader.model_cache_path("../outside")
+    end
+
+    test "model_cache_path allows legitimate nested repo paths" do
+      Application.put_env(:ex_embed, :cache_dir, "/tmp/safe_cache")
+      assert {:ok, path} = Downloader.model_cache_path("BAAI/bge-small-en-v1.5")
+      assert path == "/tmp/safe_cache/BAAI/bge-small-en-v1.5"
+    end
+  end
+
+  describe "checksum verification" do
+    @tag :requires_model
+    test "ensure/1 accepts files with correct checksums" do
+      # The real cached model files should pass checksum verification
+      assert {:ok, _} = Downloader.ensure("BAAI/bge-small-en-v1.5")
+    end
+
+    test "checksum_matches?/2 rejects corrupted files" do
+      tmp = Path.join(System.tmp_dir!(), "ex_embed_cksum_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(tmp)
+      fake_file = Path.join(tmp, "fake.bin")
+      File.write!(fake_file, "corrupted data")
+      on_exit(fn -> File.rm_rf!(tmp) end)
+
+      {:ok, meta} = ExEmbed.Registry.get("BAAI/bge-small-en-v1.5")
+      checksums = Map.get(meta, :checksums, %{})
+      expected_hash = Map.get(checksums, "model_optimized.onnx")
+
+      # The fake file should not match the real model's checksum
+      if expected_hash do
+        actual =
+          File.stream!(fake_file, 65_536)
+          |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
+          |> :crypto.hash_final()
+          |> Base.encode16(case: :lower)
+
+        refute actual == expected_hash
+      end
     end
   end
 

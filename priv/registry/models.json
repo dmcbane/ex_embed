@@ -6,6 +6,12 @@
     "hf_repo": "qdrant/bge-small-en-v1.5-onnx-q",
     "model_file": "model_optimized.onnx",
     "additional_files": ["tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"],
+    "checksums": {
+      "model_optimized.onnx": "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431",
+      "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+      "tokenizer_config.json": "0b29c7bfc889e53b36d9dd3e686dd4300f6525110eaa98c76a5dafceb2029f53",
+      "special_tokens_map.json": "5d5b662e421ea9fac075174bb0688ee0d9431699900b90662acd44b2a350503a"
+    },
     "size_gb": 0.067,
     "license": "mit",
     "default": true

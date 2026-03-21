@@ -62,12 +62,14 @@ defmodule ExEmbed.Serving do
         Nx.Serving.start_link(serving_opts)
 
       {:error, reason} ->
-        Logger.warning("[ExEmbed] Serving not started, model load failed: #{inspect(reason)}")
+        Logger.warning("[ExEmbed] Serving not started: model unavailable")
+        Logger.debug("[ExEmbed] Serving start failure detail: #{inspect(reason)}")
         :ignore
     end
   rescue
     e ->
-      Logger.warning("[ExEmbed] Serving failed to start: #{Exception.message(e)}")
+      Logger.warning("[ExEmbed] Serving failed to start")
+      Logger.debug("[ExEmbed] Serving start exception: #{Exception.message(e)}")
       :ignore
   end
 
