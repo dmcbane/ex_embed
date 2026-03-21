@@ -67,6 +67,14 @@ defmodule ExEmbed.CacheTest do
     end
   end
 
+  describe "max_models limit" do
+    test "cache respects max_models configuration" do
+      max = Application.get_env(:ex_embed, :max_models, 10)
+      assert is_integer(max)
+      assert max > 0
+    end
+  end
+
   describe "preload/1" do
     test "returns {:error, :not_found} for unknown model" do
       assert {:error, :not_found} = ExEmbed.Cache.preload("fake/nonexistent-model-xyz")

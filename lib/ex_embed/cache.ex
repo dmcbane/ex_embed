@@ -4,11 +4,19 @@ defmodule ExEmbed.Cache do
   Lazy-loads on first use: downloads if necessary, then loads into memory.
 
   The process is started automatically by `ExEmbed.Application`.
+
+  Configure `config :ex_embed, max_models: 10` to limit the number of
+  models held in memory (default: 10). Least-recently-used models are
+  evicted when the limit is reached.
   """
 
   use GenServer
   alias ExEmbed.{Downloader, Registry}
   require Logger
+
+  @default_max_models 10
+
+  # State: %{models: %{name => {entry, last_used_monotonic}}}
 
   # ── public API ─────────────────────────────────────────────────────────────
 
@@ -53,13 +61,15 @@ defmodule ExEmbed.Cache do
   @impl true
   def handle_call({:fetch, model_name}, _from, state) do
     case Map.fetch(state, model_name) do
-      {:ok, entry} ->
-        {:reply, {:ok, entry}, state}
+      {:ok, {entry, _last_used}} ->
+        # Update last-used timestamp
+        {:reply, {:ok, entry}, Map.put(state, model_name, {entry, now()})}
 
       :error ->
         case load_model(model_name) do
           {:ok, entry} ->
-            {:reply, {:ok, entry}, Map.put(state, model_name, entry)}
+            state = maybe_evict(state)
+            {:reply, {:ok, entry}, Map.put(state, model_name, {entry, now()})}
 
           {:error, _} = err ->
             {:reply, err, state}
@@ -80,7 +90,7 @@ defmodule ExEmbed.Cache do
   # ── private ────────────────────────────────────────────────────────────────
 
   defp load_model(model_name) do
-    Logger.info("[ExEmbed] Loading model: #{model_name}")
+    Logger.debug("[ExEmbed] Loading model: #{model_name}")
 
     with {:ok, meta} <- Registry.get(model_name),
          {:ok, cache_path} <- Downloader.ensure(model_name) do
@@ -102,6 +112,21 @@ defmodule ExEmbed.Cache do
       end
     end
   end
+
+  defp maybe_evict(state) do
+    max = Application.get_env(:ex_embed, :max_models, @default_max_models)
+
+    if map_size(state) >= max do
+      # Evict least-recently-used model
+      {lru_name, _} = Enum.min_by(state, fn {_name, {_entry, last_used}} -> last_used end)
+      Logger.info("[ExEmbed] Evicting LRU model: #{lru_name}")
+      Map.delete(state, lru_name)
+    else
+      state
+    end
+  end
+
+  defp now, do: System.monotonic_time(:millisecond)
 
   defp configure_tokenizer(tokenizer) do
     tokenizer

@@ -62,10 +62,13 @@ defmodule ExEmbed.Downloader do
   @spec model_cache_path(String.t()) :: {:ok, Path.t()} | {:error, :invalid_path}
   def model_cache_path(hf_repo) do
     base = cache_dir()
-    candidate = Path.join([base, hf_repo])
+    expanded_base = Path.expand(base)
+    candidate = Path.join([expanded_base, hf_repo])
     resolved = Path.expand(candidate)
 
-    if String.starts_with?(resolved, Path.expand(base) <> "/") do
+    if String.starts_with?(resolved, expanded_base <> "/") do
+      # Ensure the cache directory structure exists
+      File.mkdir_p(resolved)
       {:ok, resolved}
     else
       {:error, :invalid_path}

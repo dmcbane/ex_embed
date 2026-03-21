@@ -9,6 +9,19 @@ defmodule ExEmbed.DownloaderTest do
     :ok
   end
 
+  describe "cache_dir validation" do
+    test "ensure/1 creates cache_dir if it does not exist" do
+      tmp = Path.join(System.tmp_dir!(), "ex_embed_newdir_#{System.unique_integer([:positive])}")
+      refute File.exists?(tmp)
+      Application.put_env(:ex_embed, :cache_dir, tmp)
+      on_exit(fn -> File.rm_rf!(tmp) end)
+
+      # ensure will fail on model lookup, but cache_dir should be created
+      _result = ExEmbed.Downloader.ensure("BAAI/bge-small-en-v1.5")
+      assert File.dir?(tmp)
+    end
+  end
+
   describe "model_cache_path/1" do
     test "uses configured cache_dir" do
       Application.put_env(:ex_embed, :cache_dir, "/tmp/custom_cache")
