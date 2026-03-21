@@ -41,10 +41,10 @@ defmodule Mix.Tasks.ExEmbed.CheckRegistry do
         end
 
       {:ok, %{status: status}} ->
-        Mix.shell().error("Failed to fetch upstream list (HTTP #{status})")
+        Mix.raise("Failed to fetch upstream list (HTTP #{status})")
 
       {:error, reason} ->
-        Mix.shell().error("Network error: #{inspect(reason)}")
+        Mix.raise("Network error: #{inspect(reason)}")
     end
   end
 

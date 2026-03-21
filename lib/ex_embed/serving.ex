@@ -12,12 +12,12 @@ defmodule ExEmbed.Serving do
 
   Then at call time:
 
-      {:ok, embedding} = Nx.Serving.run(MyApp.EmbeddingServing, "my text")
-      # embedding is a 1D Nx.Tensor of shape {dim}
+      embedding = Nx.Serving.run(MyApp.EmbeddingServing, "my text")
+      # embedding is an Nx.Tensor of shape {1, dim}
 
   For a list of texts (returns {n, dim} tensor):
 
-      {:ok, embeddings} = Nx.Serving.batched_run(MyApp.EmbeddingServing, texts)
+      embeddings = Nx.Serving.run(MyApp.EmbeddingServing, ["text one", "text two"])
   """
 
   alias ExEmbed.{Cache, Pipeline}
@@ -25,16 +25,35 @@ defmodule ExEmbed.Serving do
   @doc """
   Build an `Nx.Serving` for the given model.
   The model is loaded/downloaded via `ExEmbed.Cache` on first call.
+
+  Accepts string or list-of-strings input via `Nx.Serving.run/2`.
   """
   @spec new(String.t()) :: Nx.Serving.t()
   def new(model_name \\ ExEmbed.Registry.default()) do
-    Nx.Serving.new(fn texts ->
+    Nx.Serving.new(fn _opts ->
+      # The batch_fun receives the dummy batch from preprocessing.
+      # It returns a matching tensor so Nx.Serving's internal slicing works.
+      # The real embedding result is carried in client_info.
+      fn batch ->
+        Nx.broadcast(Nx.tensor(0.0), {batch.size, 1})
+      end
+    end)
+    |> Nx.Serving.client_preprocessing(fn input ->
+      texts = List.wrap(input)
       {:ok, {model, tokenizer}} = Cache.fetch(model_name)
 
-      case Pipeline.embed(List.wrap(texts), model, tokenizer) do
-        {:ok, tensor} -> tensor
-        {:error, reason} -> raise "ExEmbed.Serving inference failed: #{inspect(reason)}"
+      case Pipeline.embed(texts, model, tokenizer) do
+        {:ok, tensor} ->
+          # Send a 1-element dummy batch through the serving machinery.
+          # The real embedding tensor is carried as client_info.
+          {Nx.Batch.stack([Nx.tensor([0])]), tensor}
+
+        {:error, reason} ->
+          raise "ExEmbed.Serving inference failed: #{inspect(reason)}"
       end
+    end)
+    |> Nx.Serving.client_postprocessing(fn {_dummy, _server_info}, tensor ->
+      tensor
     end)
   end
 end

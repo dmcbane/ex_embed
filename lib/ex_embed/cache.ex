@@ -76,10 +76,15 @@ defmodule ExEmbed.Cache do
       model_path = Path.join(cache_path, meta.model_file)
       tokenizer_path = Path.join(cache_path, "tokenizer.json")
 
-      with {:ok, model} <- Ortex.load(model_path),
-           {:ok, tokenizer} <- Tokenizers.Tokenizer.from_file(tokenizer_path) do
-        Logger.info("[ExEmbed] Model ready: #{model_name} (#{meta.dim}d)")
-        {:ok, {model, tokenizer}}
+      try do
+        model = Ortex.load(model_path)
+
+        with {:ok, tokenizer} <- Tokenizers.Tokenizer.from_file(tokenizer_path) do
+          Logger.info("[ExEmbed] Model ready: #{model_name} (#{meta.dim}d)")
+          {:ok, {model, tokenizer}}
+        end
+      rescue
+        e -> {:error, {:model_load_failed, Exception.message(e)}}
       end
     end
   end

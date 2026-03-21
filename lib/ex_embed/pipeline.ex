@@ -12,6 +12,8 @@ defmodule ExEmbed.Pipeline do
   """
   @spec embed([String.t()], Ortex.Model.t(), Tokenizers.Tokenizer.t()) ::
           {:ok, Nx.Tensor.t()} | {:error, term()}
+  def embed([], _model, _tokenizer), do: {:error, :empty_input}
+
   def embed(texts, model, tokenizer) when is_list(texts) do
     with {:ok, {ids, attention_mask, token_type_ids}} <- tokenize_batch(texts, tokenizer),
          {:ok, hidden_state} <- run_inference(model, ids, attention_mask, token_type_ids) do
@@ -29,6 +31,9 @@ defmodule ExEmbed.Pipeline do
 
   # ── private ────────────────────────────────────────────────────────────────
 
+  # ONNX models typically have a fixed max sequence length
+  @max_tokens 512
+
   defp tokenize_batch(texts, tokenizer) do
     try do
       encodings =
@@ -41,13 +46,14 @@ defmodule ExEmbed.Pipeline do
         encodings
         |> Enum.map(&length(Tokenizers.Encoding.get_ids(&1)))
         |> Enum.max()
+        |> min(@max_tokens)
 
-      # Pad all sequences to max_len
+      # Truncate to max_len then pad all sequences to max_len
       {ids_list, mask_list, type_list} =
         Enum.reduce(encodings, {[], [], []}, fn enc, {ids_acc, mask_acc, type_acc} ->
-          ids = Tokenizers.Encoding.get_ids(enc)
-          mask = Tokenizers.Encoding.get_attention_mask(enc)
-          types = Tokenizers.Encoding.get_type_ids(enc)
+          ids = Tokenizers.Encoding.get_ids(enc) |> Enum.take(max_len)
+          mask = Tokenizers.Encoding.get_attention_mask(enc) |> Enum.take(max_len)
+          types = Tokenizers.Encoding.get_type_ids(enc) |> Enum.take(max_len)
 
           pad_len = max_len - length(ids)
           ids_padded = ids ++ List.duplicate(0, pad_len)
@@ -73,13 +79,14 @@ defmodule ExEmbed.Pipeline do
 
       hidden =
         case result do
-          {:ok, %{"last_hidden_state" => h}} -> h
-          {:ok, {h, _}} -> h
-          {:ok, [h | _]} -> h
+          {h} -> h
+          {h, _} -> h
+          {h, _, _} -> h
           other -> raise "Unexpected ONNX output shape: #{inspect(other)}"
         end
 
-      {:ok, hidden}
+      # Transfer from Ortex backend to default Nx backend for math ops
+      {:ok, Nx.backend_transfer(hidden)}
     rescue
       e -> {:error, {:inference_failed, e}}
     end
