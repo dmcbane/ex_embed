@@ -49,14 +49,25 @@ defmodule ExEmbed.MixProject do
   defp package do
     [
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/dmcbane/ex_embed"}
+      links: %{
+        "GitHub" => "https://github.com/dmcbane/ex_embed",
+        "Changelog" => "https://github.com/dmcbane/ex_embed/blob/main/CHANGELOG.md"
+      },
+      files: ~w(lib priv/registry .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
   defp docs do
     [
       main: "ExEmbed",
-      source_url: "https://github.com/dmcbane/ex_embed"
+      source_url: "https://github.com/dmcbane/ex_embed",
+      homepage_url: "https://github.com/dmcbane/ex_embed",
+      extras: ["README.md", "CHANGELOG.md"],
+      groups_for_modules: [
+        "Public API": [ExEmbed],
+        Pipeline: [ExEmbed.Pipeline, ExEmbed.Serving],
+        Infrastructure: [ExEmbed.Cache, ExEmbed.Registry, ExEmbed.Downloader, ExEmbed.HFClient]
+      ]
     ]
   end
 end

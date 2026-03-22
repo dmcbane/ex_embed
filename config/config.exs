@@ -1,8 +1,5 @@
 import Config
 
-# Use EXLA for JIT-compiled pooling/normalization in Pipeline.mean_pool_and_normalize/2
-config :nx, default_defn_options: [compiler: EXLA]
-
 # Semantic versioning via conventional commits
 config :git_ops,
   mix_project: ExEmbed.MixProject,
@@ -20,3 +17,13 @@ config :git_ops,
   manage_mix_version?: true,
   manage_readme_version: false,
   version_tag_prefix: "v"
+
+# Optional: EXLA acceleration for defn-compiled pooling/normalization.
+# Users of this library should add this to their own config if desired:
+#
+#   config :nx, default_defn_options: [compiler: EXLA]
+#
+# For ExEmbed development, we enable it here:
+if config_env() in [:dev, :test] do
+  config :nx, default_defn_options: [compiler: EXLA]
+end
